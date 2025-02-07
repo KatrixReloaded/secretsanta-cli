@@ -5,15 +5,31 @@ patterns:
         confidence: low
     - pattern:
         name: Ethereum Private Key
-        regex: /(^|\b)(0x)?[0-9a-fA-F]{64}(\b|$)/
+        regex: /(\b[A-Z_]*PRIVATE[_A-Z]*=\s*"?)(0x)?[0-9a-fA-F]{64}("?)/
         confidence: high
     - pattern:
         name: Bitcoin Private Key
-        regex: /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/g
+        regex: /(\b[A-Z_]*BTC[_A-Z]*=\s*"?)(5[HJK][1-9A-HJ-NP-Za-km-z]{49}|K[1-9A-HJ-NP-Za-km-z]{51}|L[1-9A-HJ-NP-Za-km-z]{51})("?)/
+        confidence: high
+    - pattern:
+        name: Bitcoin Private Key 3
+        regex: /(\b[A-Z_]+=\s*"?)(5[HJK][1-9A-HJ-NP-Za-km-z]{49}|K[1-9A-HJ-NP-Za-km-z]{51}|L[1-9A-HJ-NP-Za-km-z]{51})("?)/
+        confidence: high
+    - pattern:
+        name: Bitcoin Private Key 2
+        regex: /(\b[A-Z_]*BITCOIN[_A-Z]*=\s*"?)(5[HJK][1-9A-HJ-NP-Za-km-z]{49}|K[1-9A-HJ-NP-Za-km-z]{51}|L[1-9A-HJ-NP-Za-km-z]{51})("?)/
         confidence: high
     - pattern:
         name: Monero Private Key
-        regex: /4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}$/g
+        regex: /(\b[A-Z_]*XMR[_A-Z]*=\s*"?)(4[0-9AB][1-9A-HJ-NP-Za-km-z]{93})("?)/
+        confidence: high
+    - pattern:
+        name: Monero Private Key 2
+        regex: /(\b[A-Z_]*MONERO[_A-Z]*=\s*"?)(4[0-9AB][1-9A-HJ-NP-Za-km-z]{93})("?)/
+        confidence: high
+    - pattern:
+        name: Monero Private Key 3
+        regex: /(\b[A-Z_]+=\s*"?)(4[0-9AB][1-9A-HJ-NP-Za-km-z]{93})("?)/
         confidence: high
     - pattern:
         name: PuTTY SSH RSA Key
@@ -38,19 +54,19 @@ patterns:
     - pattern:
         name: Password etc passwd
         regex: /^[a-zA-Z0-9\-]+:[x|\*]:\d+:\d+:[a-zA-Z0-9/\- "]*:/[a-zA-Z0-9/\-]*:/[a-zA-Z0-9/\-]+$/
-        confidence: low
+        confidence: high
     - pattern:
         name: Password etc shadow
         regex: /^[a-zA-Z0-9\-]+:(?:(?:!!?)|(?:\*LOCK\*?)|\*|(?:\*LCK\*?)|(?:\$.*\$.*\$.*?)?):\d*:\d*:\d*:\d*:\d*:\d*:$/
-        confidence: low
+        confidence: high
     - pattern:
         name: JWK
         regex: /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/gm
-        confidence: low
+        confidence: high
     - pattern:
         name: PGP Private
         regex: /^(-----BEGIN PGP PRIVATE KEY BLOCK-----).*([a-zA-Z0-9//\n\/\.\:\+\ \=]+).*(-----END PGP PRIVATE KEY BLOCK-----)$/
-        confidence: low
+        confidence: high
     - pattern:
         name: AWS API Key
         regex: AKIA[0-9A-Z]{16}
@@ -411,10 +427,10 @@ patterns:
         name: Beamer
         regex: (?:beamer).{0,40}\b([a-zA-Z0-9_+/]{45}=)
         confidence: high
-    - pattern:
-        name: Bearer token
-        regex: (bearer).+
-        confidence: low
+    # - pattern:
+    #     name: Bearer token
+    #     regex: (bearer).+
+    #     confidence: low
     - pattern:
         name: Beebole
         regex: (?:beebole).{0,40}\b([0-9a-z]{40})\b
@@ -1252,290 +1268,290 @@ patterns:
         name: Geckoboard
         regex: (?:geckoboard).{0,40}\b([a-zA-Z0-9]{44})\b
         confidence: high
-    - pattern:
-        name: Generic - 1376
-        regex: jdbc:mysql(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: Generic - 1688
-        regex: TOKEN[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
-        confidence: low
-    - pattern:
-        name: Generic - 1689
-        regex: API[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
-        confidence: low
-    - pattern:
-        name: Generic - 1691
-        regex: SECRET[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
-        confidence: low
-    - pattern:
-        name: Generic - 1692
-        regex: AUTHORIZATION[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
-        confidence: low
-    - pattern:
-        name: Generic - 1693
-        regex: PASSWORD[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
-        confidence: low
-    - pattern:
-        name: Generic - 1695
-        regex: (A|a)(P|p)(Ii)[\-|_|A-Za-z0-9]*(\''|")?( )*(:|=)( )*(\''|")?[0-9A-Za-z\-_]+(\''|")?
-        confidence: low
-    - pattern:
-        name: Generic - 1700
-        regex: BEGIN OPENSSH PRIVATE KEY
-        confidence: high
-    - pattern:
-        name: Generic - 1701
-        regex: BEGIN PRIVATE KEY
-        confidence: high
-    - pattern:
-        name: Generic - 1702
-        regex: BEGIN RSA PRIVATE KEY
-        confidence: high
-    - pattern:
-        name: Generic - 1703
-        regex: BEGIN DSA PRIVATE KEY
-        confidence: high
-    - pattern:
-        name: Generic - 1704
-        regex: BEGIN EC PRIVATE KEY
-        confidence: high
-    - pattern:
-        name: Generic - 1705
-        regex: BEGIN PGP PRIVATE KEY BLOCK
-        confidence: high
-    - pattern:
-        name: Generic - 1707
-        regex: '[a-z0-9.-]+\.s3-[a-z0-9-]\.amazonaws\.com'
-        confidence: low
-    - pattern:
-        name: Generic - 1708
-        regex: '[a-z0-9.-]+\.s3-website[.-](eu|ap|us|ca|sa|cn)'
-        confidence: low
-    - pattern:
-        name: Generic - 1710
-        regex: algolia_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1711
-        regex: asana_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1713
-        regex: azure_tenant
-        confidence: high
-    - pattern:
-        name: Generic - 1714
-        regex: bitly_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1715
-        regex: branchio_secret
-        confidence: low
-    - pattern:
-        name: Generic - 1716
-        regex: browserstack_access_key
-        confidence: high
-    - pattern:
-        name: Generic - 1717
-        regex: buildkite_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1718
-        regex: comcast_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1719
-        regex: datadog_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1720
-        regex: deviantart_secret
-        confidence: high
-    - pattern:
-        name: Generic - 1721
-        regex: deviantart_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1722
-        regex: dropbox_api_token
-        confidence: high
-    - pattern:
-        name: Generic - 1723
-        regex: facebook_appsecret
-        confidence: high
-    - pattern:
-        name: Generic - 1724
-        regex: facebook_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1725
-        regex: firebase_custom_token
-        confidence: high
-    - pattern:
-        name: Generic - 1726
-        regex: firebase_id_token
-        confidence: high
-    - pattern:
-        name: Generic - 1727
-        regex: github_client
-        confidence: high
-    - pattern:
-        name: Generic - 1728
-        regex: github_ssh_key
-        confidence: high
-    - pattern:
-        name: Generic - 1730
-        regex: gitlab_private_token
-        confidence: high
-    - pattern:
-        name: Generic - 1731
-        regex: google_cm
-        confidence: low
-    - pattern:
-        name: Generic - 1732
-        regex: google_maps_key
-        confidence: low
-    - pattern:
-        name: Generic - 1733
-        regex: heroku_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1734
-        regex: instagram_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1735
-        regex: mailchimp_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1736
-        regex: mailgun_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1737
-        regex: mailjet
-        confidence: low
-    - pattern:
-        name: Generic - 1738
-        regex: mapbox_access_token
-        confidence: low
-    - pattern:
-        name: Generic - 1739
-        regex: pagerduty_api_token
-        confidence: high
-    - pattern:
-        name: Generic - 1740
-        regex: paypal_key_sb
-        confidence: high
-    - pattern:
-        name: Generic - 1741
-        regex: paypal_key_live
-        confidence: high
-    - pattern:
-        name: Generic - 1742
-        regex: paypal_token_sb
-        confidence: high
-    - pattern:
-        name: Generic - 1743
-        regex: paypal_token_live
-        confidence: high
-    - pattern:
-        name: Generic - 1744
-        regex: pendo_integration_key
-        confidence: high
-    - pattern:
-        name: Generic - 1745
-        regex: salesforce_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1746
-        regex: saucelabs_ukey
-        confidence: high
-    - pattern:
-        name: Generic - 1747
-        regex: sendgrid_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1748
-        regex: slack_api_token
-        confidence: high
-    - pattern:
-        name: Generic - 1749
-        regex: slack_webhook
-        confidence: low
-    - pattern:
-        name: Generic - 1750
-        regex: square_secret
-        confidence: low
-    - pattern:
-        name: Generic - 1751
-        regex: square_auth_token
-        confidence: high
-    - pattern:
-        name: Generic - 1752
-        regex: travisci_api_token
-        confidence: high
-    - pattern:
-        name: Generic - 1753
-        regex: twilio_sid_token
-        confidence: low
-    - pattern:
-        name: Generic - 1754
-        regex: twitter_api_secret
-        confidence: high
-    - pattern:
-        name: Generic - 1755
-        regex: twitter_bearer_token
-        confidence: high
-    - pattern:
-        name: Generic - 1756
-        regex: spotify_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1757
-        regex: stripe_key_live
-        confidence: high
-    - pattern:
-        name: Generic - 1758
-        regex: wakatime_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1759
-        regex: wompi_auth_bearer_sb
-        confidence: high
-    - pattern:
-        name: Generic - 1760
-        regex: wompi_auth_bearer_live
-        confidence: high
-    - pattern:
-        name: Generic - 1761
-        regex: wpengine_api_key
-        confidence: high
-    - pattern:
-        name: Generic - 1762
-        regex: zapier_webhook
-        confidence: low
-    - pattern:
-        name: Generic - 1763
-        regex: zendesk_access_token
-        confidence: high
-    - pattern:
-        name: Generic - 1764
-        regex: ssh-rsa
-        confidence: high
-    - pattern:
-        name: Generic - 1765
-        regex: s3-[a-z0-9-]+\.amazonaws\.com/[a-z0-9._-]+
-        confidence: low
-    - pattern:
-        name: Generic Secret
-        regex: '[sS][eE][cC][rR][eE][tT].*[''|"][0-9a-zA-Z]{32,45}[''|"]'
-        confidence: low
-    - pattern:
-        name: Generic webhook secret
-        regex: (webhook).+(secret|token|key).+
-        confidence: low
+    # - pattern:
+    #     name: Generic - 1376
+    #     regex: jdbc:mysql(=| =|:| :)
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1688
+    #     regex: TOKEN[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1689
+    #     regex: API[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1691
+    #     regex: SECRET[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1692
+    #     regex: AUTHORIZATION[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1693
+    #     regex: PASSWORD[\\-|_|A-Z0-9]*(\'|\")?(:|=)(\'|\")?[\\-|_|A-Z0-9]{10}
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1695
+    #     regex: (A|a)(P|p)(Ii)[\-|_|A-Za-z0-9]*(\''|")?( )*(:|=)( )*(\''|")?[0-9A-Za-z\-_]+(\''|")?
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1700
+    #     regex: BEGIN OPENSSH PRIVATE KEY
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1701
+    #     regex: BEGIN PRIVATE KEY
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1702
+    #     regex: BEGIN RSA PRIVATE KEY
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1703
+    #     regex: BEGIN DSA PRIVATE KEY
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1704
+    #     regex: BEGIN EC PRIVATE KEY
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1705
+    #     regex: BEGIN PGP PRIVATE KEY BLOCK
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1707
+    #     regex: '[a-z0-9.-]+\.s3-[a-z0-9-]\.amazonaws\.com'
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1708
+    #     regex: '[a-z0-9.-]+\.s3-website[.-](eu|ap|us|ca|sa|cn)'
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1710
+    #     regex: algolia_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1711
+    #     regex: asana_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1713
+    #     regex: azure_tenant
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1714
+    #     regex: bitly_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1715
+    #     regex: branchio_secret
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1716
+    #     regex: browserstack_access_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1717
+    #     regex: buildkite_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1718
+    #     regex: comcast_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1719
+    #     regex: datadog_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1720
+    #     regex: deviantart_secret
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1721
+    #     regex: deviantart_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1722
+    #     regex: dropbox_api_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1723
+    #     regex: facebook_appsecret
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1724
+    #     regex: facebook_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1725
+    #     regex: firebase_custom_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1726
+    #     regex: firebase_id_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1727
+    #     regex: github_client
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1728
+    #     regex: github_ssh_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1730
+    #     regex: gitlab_private_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1731
+    #     regex: google_cm
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1732
+    #     regex: google_maps_key
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1733
+    #     regex: heroku_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1734
+    #     regex: instagram_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1735
+    #     regex: mailchimp_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1736
+    #     regex: mailgun_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1737
+    #     regex: mailjet
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1738
+    #     regex: mapbox_access_token
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1739
+    #     regex: pagerduty_api_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1740
+    #     regex: paypal_key_sb
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1741
+    #     regex: paypal_key_live
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1742
+    #     regex: paypal_token_sb
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1743
+    #     regex: paypal_token_live
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1744
+    #     regex: pendo_integration_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1745
+    #     regex: salesforce_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1746
+    #     regex: saucelabs_ukey
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1747
+    #     regex: sendgrid_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1748
+    #     regex: slack_api_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1749
+    #     regex: slack_webhook
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1750
+    #     regex: square_secret
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1751
+    #     regex: square_auth_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1752
+    #     regex: travisci_api_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1753
+    #     regex: twilio_sid_token
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1754
+    #     regex: twitter_api_secret
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1755
+    #     regex: twitter_bearer_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1756
+    #     regex: spotify_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1757
+    #     regex: stripe_key_live
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1758
+    #     regex: wakatime_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1759
+    #     regex: wompi_auth_bearer_sb
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1760
+    #     regex: wompi_auth_bearer_live
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1761
+    #     regex: wpengine_api_key
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1762
+    #     regex: zapier_webhook
+    #     confidence: low
+    # - pattern:
+    #     name: Generic - 1763
+    #     regex: zendesk_access_token
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1764
+    #     regex: ssh-rsa
+    #     confidence: high
+    # - pattern:
+    #     name: Generic - 1765
+    #     regex: s3-[a-z0-9-]+\.amazonaws\.com/[a-z0-9._-]+
+    #     confidence: low
+    # - pattern:
+    #     name: Generic Secret
+    #     regex: '[sS][eE][cC][rR][eE][tT].*[''|"][0-9a-zA-Z]{32,45}[''|"]'
+    #     confidence: low
+    # - pattern:
+    #     name: Generic webhook secret
+    #     regex: (webhook).+(secret|token|key).+
+    #     confidence: low
     - pattern:
         name: Gengo
         regex: (?:gengo).{0,40}([ ]{0,1}[0-9a-zA-Z\[\]\-\(\)\{\}|_^@$=~]{64}[ \r\n]{1})
@@ -3763,34 +3779,34 @@ patterns:
         name: aos_sec
         regex: aos[_-]?sec(=| =|:| :)
         confidence: low
-    - pattern:
-        name: api_key
-        regex: api[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: api_key_secret
-        regex: api[_-]?key[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: api_key_sid
-        regex: api[_-]?key[_-]?sid(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: api_secret
-        regex: api[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: apiary_api_key
-        regex: apiary[_-]?api[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: apigw_access_token
-        regex: apigw[_-]?access[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: apikey_patterns
-        regex: apikey[:](?:['"]?[a-zA-Z0-9-_|]+['"]?)
-        confidence: low
+    # - pattern:
+    #     name: api_key
+    #     regex: api[_-]?key(=| =|:| :)
+    #     confidence: low
+    # - pattern:
+    #     name: api_key_secret
+    #     regex: api[_-]?key[_-]?secret(=| =|:| :)
+    #     confidence: low
+    # - pattern:
+    #     name: api_key_sid
+    #     regex: api[_-]?key[_-]?sid(=| =|:| :)
+    #     confidence: low
+    # - pattern:
+    #     name: api_secret
+    #     regex: api[_-]?secret(=| =|:| :)
+    #     confidence: low
+    # - pattern:
+    #     name: apiary_api_key
+    #     regex: apiary[_-]?api[_-]?key(=| =|:| :)
+    #     confidence: low
+    # - pattern:
+    #     name: apigw_access_token
+    #     regex: apigw[_-]?access[_-]?token(=| =|:| :)
+    #     confidence: low
+    # - pattern:
+    #     name: apikey_patterns
+    #     regex: apikey[:](?:['"]?[a-zA-Z0-9-_|]+['"]?)
+    #     confidence: low
     - pattern:
         name: app_bucket_perm
         regex: app[_-]?bucket[_-]?perm(=| =|:| :)
@@ -5552,584 +5568,12 @@ patterns:
         regex: '-----(?:(?:BEGIN|END) )(?:(?:EC|PGP|DSA|RSA|OPENSSH).)?PRIVATE.KEY(.BLOCK)?-----'
         confidence: low
     - pattern:
-        name: private_signing_password
-        regex: private[_-]?signing[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: prod_access_key_id
-        regex: prod[_-]?access[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: prod_password
-        regex: prod[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: prod_secret_key
-        regex: prod[_-]?secret[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: project_config
-        regex: project[_-]?config(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: publish_access
-        regex: publish[_-]?access(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: publish_key
-        regex: publish[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: publish_secret
-        regex: publish[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: pushover_token
-        regex: pushover[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: pypi_passowrd
-        regex: pypi[_-]?passowrd(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: qiita_token
-        regex: qiita[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: quip_token
-        regex: quip[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rabbitmq_password
-        regex: rabbitmq[_-]?password(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: randrmusicapiaccesstoken
-        regex: randrmusicapiaccesstoken(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: redis_stunnel_urls
-        regex: redis[_-]?stunnel[_-]?urls(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rediscloud_url
-        regex: rediscloud[_-]?url(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: refresh_token
-        regex: refresh[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: registry_pass
-        regex: registry[_-]?pass(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: registry_secure
-        regex: registry[_-]?secure(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: release_gh_token
-        regex: release[_-]?gh[_-]?token(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: release_token
-        regex: release[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: reporting_webdav_pwd
-        regex: reporting[_-]?webdav[_-]?pwd(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: reporting_webdav_url
-        regex: reporting[_-]?webdav[_-]?url(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: repotoken
-        regex: repotoken(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rest_api_key
-        regex: rest[_-]?api[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rinkeby_private_key
-        regex: rinkeby[_-]?private[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: ropsten_private_key
-        regex: ropsten[_-]?private[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: route53_access_key_id
-        regex: route53[_-]?access[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rtd_key_pass
-        regex: rtd[_-]?key[_-]?pass(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rtd_store_pass
-        regex: rtd[_-]?store[_-]?pass(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: rubygems_auth_token
-        regex: rubygems[_-]?auth[_-]?token(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: s3_access_key
-        regex: s3[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_access_key_id
-        regex: s3[_-]?access[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_bucket_name_app_logs
-        regex: s3[_-]?bucket[_-]?name[_-]?app[_-]?logs(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_bucket_name_assets
-        regex: s3[_-]?bucket[_-]?name[_-]?assets(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_external_3_amazonaws_com
-        regex: s3[_-]?external[_-]?3[_-]?amazonaws[_-]?com(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_key
-        regex: s3[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_key_app_logs
-        regex: s3[_-]?key[_-]?app[_-]?logs(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_key_assets
-        regex: s3[_-]?key[_-]?assets(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_secret_app_logs
-        regex: s3[_-]?secret[_-]?app[_-]?logs(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_secret_assets
-        regex: s3[_-]?secret[_-]?assets(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_secret_key
-        regex: s3[_-]?secret[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: s3_user_secret
-        regex: s3[_-]?user[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sacloud_access_token
-        regex: sacloud[_-]?access[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sacloud_access_token_secret
-        regex: sacloud[_-]?access[_-]?token[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sacloud_api
-        regex: sacloud[_-]?api(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: salesforce_bulk_test_password
-        regex: salesforce[_-]?bulk[_-]?test[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: salesforce_bulk_test_security_token
-        regex: salesforce[_-]?bulk[_-]?test[_-]?security[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sandbox_access_token
-        regex: sandbox[_-]?access[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sandbox_aws_access_key_id
-        regex: sandbox[_-]?aws[_-]?access[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sandbox_aws_secret_access_key
-        regex: sandbox[_-]?aws[_-]?secret[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sauce_access_key
-        regex: sauce[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
         name: sauce_token
         regex: (sauce.{0,50}("|')?[0-9a-f-]{36}("|')?)
         confidence: low
     - pattern:
-        name: scrutinizer_token
-        regex: scrutinizer[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sdr_token
-        regex: sdr[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_0
-        regex: secret[_-]?0(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_1
-        regex: secret[_-]?1(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_10
-        regex: secret[_-]?10(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_11
-        regex: secret[_-]?11(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_2
-        regex: secret[_-]?2(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_3
-        regex: secret[_-]?3(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_4
-        regex: secret[_-]?4(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_5
-        regex: secret[_-]?5(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_6
-        regex: secret[_-]?6(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_7
-        regex: secret[_-]?7(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_8
-        regex: secret[_-]?8(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_9
-        regex: secret[_-]?9(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secret_key_base
-        regex: secret[_-]?key[_-]?base(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secretaccesskey
-        regex: secretaccesskey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: secretkey
-        regex: secretkey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: segment_api_key
-        regex: segment[_-]?api[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: selion_log_level_dev
-        regex: selion[_-]?log[_-]?level[_-]?dev(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: selion_selenium_host
-        regex: selion[_-]?selenium[_-]?host(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendgrid - 2
-        regex: sendgrid(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendgrid_api_key - 1
-        regex: sendgrid[_-]?api[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendgrid_key
-        regex: sendgrid[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendgrid_password
-        regex: sendgrid[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendgrid_user
-        regex: sendgrid[_-]?user(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendgrid_username
-        regex: sendgrid[_-]?username(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sendwithus_key
-        regex: sendwithus[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sentry_auth_token
-        regex: sentry[_-]?auth[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sentry_default_org
-        regex: sentry[_-]?default[_-]?org(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sentry_endpoint
-        regex: sentry[_-]?endpoint(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sentry_key
-        regex: sentry[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: service_account_secret
-        regex: service[_-]?account[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: ses_access_key
-        regex: ses[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: ses_secret_key
-        regex: ses[_-]?secret[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: setdstaccesskey
-        regex: setdstaccesskey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: setdstsecretkey
-        regex: setdstsecretkey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: setsecretkey
-        regex: setsecretkey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: signing_key
-        regex: signing[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: signing_key_password
-        regex: signing[_-]?key[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: signing_key_secret
-        regex: signing[_-]?key[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: signing_key_sid
-        regex: signing[_-]?key[_-]?sid(=| =|:| :)
-        confidence: low
-    - pattern:
         name: slack_webhook_url
         regex: (hooks.slack.com/services/T[A-Z0-9]{8}/B[A-Z0-9]{8}/[a-zA-Z0-9]{1,})
-        confidence: low
-    - pattern:
-        name: slash_developer_space
-        regex: slash[_-]?developer[_-]?space(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: slash_developer_space_key
-        regex: slash[_-]?developer[_-]?space[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: slate_user_email
-        regex: slate[_-]?user[_-]?email(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: snoowrap_client_secret
-        regex: snoowrap[_-]?client[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: snoowrap_password
-        regex: snoowrap[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: snoowrap_refresh_token
-        regex: snoowrap[_-]?refresh[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: snyk_api_token
-        regex: snyk[_-]?api[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: snyk_token
-        regex: snyk[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: socrata_app_token
-        regex: socrata[_-]?app[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: socrata_password
-        regex: socrata[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonar_organization_key
-        regex: sonar[_-]?organization[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonar_project_key
-        regex: sonar[_-]?project[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonar_token
-        regex: sonar[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonarqube_docs_api_key
-        regex: (sonar.{0,50}("|')?[0-9a-f]{40}("|')?)
-        confidence: low
-    - pattern:
-        name: sonatype_gpg_key_name
-        regex: sonatype[_-]?gpg[_-]?key[_-]?name(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatype_gpg_passphrase
-        regex: sonatype[_-]?gpg[_-]?passphrase(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatype_nexus_password
-        regex: sonatype[_-]?nexus[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatype_pass
-        regex: sonatype[_-]?pass(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatype_password
-        regex: sonatype[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatype_token_password
-        regex: sonatype[_-]?token[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatype_token_user
-        regex: sonatype[_-]?token[_-]?user(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sonatypepassword
-        regex: sonatypepassword(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: soundcloud_client_secret
-        regex: soundcloud[_-]?client[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: soundcloud_password
-        regex: soundcloud[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: spaces_access_key_id
-        regex: spaces[_-]?access[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: spaces_secret_access_key
-        regex: spaces[_-]?secret[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: spotify_api_access_token
-        regex: spotify[_-]?api[_-]?access[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: spotify_api_client_secret
-        regex: spotify[_-]?api[_-]?client[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: spring_mail_password
-        regex: spring[_-]?mail[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sqsaccesskey
-        regex: sqsaccesskey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: sqssecretkey
-        regex: sqssecretkey(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: square_app_secret
-        regex: (sq0[a-z]{3}-[0-9A-Za-z-_]{20,50})
-        confidence: low
-    - pattern:
-        name: square_reader_sdk_repository_password
-        regex: square[_-]?reader[_-]?sdk[_-]?repository[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: srcclr_api_token
-        regex: srcclr[_-]?api[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: ssh_password
-        regex: (sshpass -p.*['|"])
-        confidence: low
-    - pattern:
-        name: sshpass
-        regex: sshpass(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: ssmtp_config
-        regex: ssmtp[_-]?config(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: staging_base_url_runscope
-        regex: staging[_-]?base[_-]?url[_-]?runscope(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: star_test_aws_access_key_id
-        regex: star[_-]?test[_-]?aws[_-]?access[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: star_test_bucket
-        regex: star[_-]?test[_-]?bucket(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: star_test_location
-        regex: star[_-]?test[_-]?location(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: star_test_secret_access_key
-        regex: star[_-]?test[_-]?secret[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: starship_account_sid
-        regex: starship[_-]?account[_-]?sid(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: starship_auth_token
-        regex: starship[_-]?auth[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: stormpath_api_key_id
-        regex: stormpath[_-]?api[_-]?key[_-]?id(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: stormpath_api_key_secret
-        regex: stormpath[_-]?api[_-]?key[_-]?secret(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: strip_publishable_key
-        regex: strip[_-]?publishable[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: strip_secret_key
-        regex: strip[_-]?secret[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: stripe_private
-        regex: stripe[_-]?private(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: stripe_public
-        regex: stripe[_-]?public(=| =|:| :)
         confidence: low
     - pattern:
         name: stripe_restricted_api
@@ -6139,130 +5583,6 @@ patterns:
         name: stripe_standard_api
         regex: (sk_live_[0-9a-zA-Z]{24,34})
         confidence: low
-    - pattern:
-        name: surge_login
-        regex: surge[_-]?login(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: surge_token
-        regex: surge[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: svn_pass
-        regex: svn[_-]?pass(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: tesco_api_key
-        regex: tesco[_-]?api[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: test_github_token
-        regex: test[_-]?github[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: test_test
-        regex: test[_-]?test(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: tester_keys_password
-        regex: tester[_-]?keys[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: thera_oss_access_key
-        regex: thera[_-]?oss[_-]?access[_-]?key(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: token_core_java
-        regex: token[_-]?core[_-]?java(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_access_token
-        regex: travis[_-]?access[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_api_token
-        regex: travis[_-]?api[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_branch
-        regex: travis[_-]?branch(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_com_token
-        regex: travis[_-]?com[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_e2e_token
-        regex: travis[_-]?e2e[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_gh_token
-        regex: travis[_-]?gh[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_pull_request
-        regex: travis[_-]?pull[_-]?request(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: travis_secure_env_vars
-        regex: travis[_-]?secure[_-]?env[_-]?vars(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: travis_token
-        regex: travis[_-]?token(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: trex_client_token
-        regex: trex[_-]?client[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: trex_okta_client_token
-        regex: trex[_-]?okta[_-]?client[_-]?token(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: twilio_api_key
-        regex: twilio[_-]?api[_-]?key(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twilio_api_secret
-        regex: twilio[_-]?api[_-]?secret(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twilio_chat_account_api_service
-        regex: twilio[_-]?chat[_-]?account[_-]?api[_-]?service(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twilio_configuration_sid
-        regex: twilio[_-]?configuration[_-]?sid(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: twilio_sid
-        regex: twilio[_-]?sid(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: twilio_token
-        regex: twilio[_-]?token(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twine_password
-        regex: twine[_-]?password(=| =|:| :)
-        confidence: low
-    - pattern:
-        name: twitter_consumer_key
-        regex: twitter[_-]?consumer[_-]?key(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twitter_consumer_secret
-        regex: twitter[_-]?consumer[_-]?secret(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twitteroauthaccesssecret
-        regex: twitteroauthaccesssecret(=| =|:| :)
-        confidence: high
-    - pattern:
-        name: twitteroauthaccesstoken
-        regex: twitteroauthaccesstoken(=| =|:| :)
-        confidence: high
     - pattern:
         name: unity_password
         regex: unity[_-]?password(=| =|:| :)

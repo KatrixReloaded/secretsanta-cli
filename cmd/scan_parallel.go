@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"regexp"
 	"strings"
@@ -18,7 +19,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var apiLimiter = time.NewTicker(750 * time.Millisecond)
+var apiLimiter = time.NewTicker(720 * time.Millisecond)
 
 func waitForAPICall() {
 	<-apiLimiter.C
@@ -51,6 +52,11 @@ func loadPatterns(yamlFile string) ([]*regexp.Regexp, error) {
 
 	var compiledPatterns []*regexp.Regexp
 	for _, entry := range config.Patterns {
+		patternStr := entry.Pattern.Regex
+		if strings.HasSuffix(patternStr, `(=| =|:| :)`) {
+			continue
+		}
+
 		compiledPattern, err := regexp.Compile(entry.Pattern.Regex)
 		if err != nil {
 			return nil, fmt.Errorf("invalid regex pattern for %s: %v", entry.Pattern.Name, err)
@@ -76,14 +82,29 @@ func scanFileForSecrets(fileContent string, patterns []*regexp.Regexp) []string 
 
 func scanRepositoryFiles(client *github.Client, org, repo, branch, path string, patterns []*regexp.Regexp) []string {
 	var findings []string
+	maxRetries := 3
 
-	waitForAPICall()
-	file, dirs, resp, err := client.Repositories.GetContents(
-		context.Background(), org, repo, path,
-		&github.RepositoryContentGetOptions{Ref: branch},
-	)
+	var file *github.RepositoryContent
+	var dirs []*github.RepositoryContent
+	var resp *github.Response
+	var err error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		waitForAPICall()
+		file, dirs, resp, err = client.Repositories.GetContents(
+			context.Background(), org, repo, path,
+			&github.RepositoryContentGetOptions{Ref: branch},
+		)
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries-1 {
+			jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+			time.Sleep(200*time.Millisecond + jitter)
+		}
+	}
 	if err != nil {
-		log.Printf("Error fetching contents for %s at path %q on branch %s: %v\n", repo, path, branch, err)
+		log.Printf("Error fetching contents for %s at path %q on branch %s after retries: %v\n", repo, path, branch, err)
 		return findings
 	}
 	_ = resp
@@ -103,17 +124,30 @@ func scanRepositoryFiles(client *github.Client, org, repo, branch, path string, 
 
 		switch content.GetType() {
 		case "file":
-			if strings.EqualFold(*content.Path, "package.json") ||
+			if strings.EqualFold(*content.Path, "package.json") || strings.EqualFold(*content.Path, "package-lock.json") || strings.EqualFold(*content.Path, "yarn.lock") ||
 				strings.HasSuffix(strings.ToLower(*content.Path), ".md") {
 				continue
 			}
-			waitForAPICall()
-			fileContent, _, respFile, errFile := client.Repositories.GetContents(
-				context.Background(), org, repo, *content.Path,
-				&github.RepositoryContentGetOptions{Ref: branch},
-			)
+
+			var fileContent *github.RepositoryContent
+			var respFile *github.Response
+			var errFile error
+			for attempt := 0; attempt < maxRetries; attempt++ {
+				waitForAPICall()
+				fileContent, _, respFile, errFile = client.Repositories.GetContents(
+					context.Background(), org, repo, *content.Path,
+					&github.RepositoryContentGetOptions{Ref: branch},
+				)
+				if errFile == nil && fileContent != nil && fileContent.Content != nil {
+					break
+				}
+				if attempt < maxRetries-1 {
+					jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+					time.Sleep(200*time.Millisecond + jitter)
+				}
+			}
 			if errFile != nil || fileContent == nil || fileContent.Content == nil {
-				log.Printf("Error reading file %s in %s: %v\n", *content.Path, repo, errFile)
+				log.Printf("Error reading file %s in %s after retries: %v\n", *content.Path, repo, errFile)
 				continue
 			}
 			_ = respFile
@@ -149,11 +183,15 @@ func scanReposAndBranches(client *github.Client, org string, patterns []*regexp.
 
 	var wg sync.WaitGroup
 	for _, repo := range repos {
+		log.Println(*repo.Name)
 		// if i >= n {
 		// 	fmt.Println("Done!")
 		// 	break
 		// }
 		// i++
+		if *repo.Name == "docs" {
+			continue
+		}
 		branches, _, err := client.Repositories.ListBranches(context.Background(), org, *repo.Name, nil)
 		if err != nil {
 			log.Printf("Error fetching branches for %s: %v\n", *repo.Name, err)
