@@ -6,7 +6,7 @@ package cmd
 import (
 	"os"
 
-	// "secretsanta-cli/cli"
+	"secretsanta-cli/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -22,8 +22,8 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// cli.Execute()
-		run()
+		cli.Execute()
+		// run()
 	},
 }
 
