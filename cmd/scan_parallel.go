@@ -5,7 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"math/rand"
+
+	// "math/rand"
 	"os"
 	"regexp"
 	"strings"
@@ -17,9 +18,10 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/time/rate"
 )
 
-var apiLimiter = time.NewTicker(720 * time.Millisecond)
+var apiLimiter = time.NewTicker(850 * time.Millisecond)
 
 func waitForAPICall() {
 	<-apiLimiter.C
@@ -80,96 +82,112 @@ func scanFileForSecrets(fileContent string, patterns []*regexp.Regexp) []string 
 	return matches
 }
 
-func scanRepositoryFiles(client *github.Client, org, repo, branch, path string, patterns []*regexp.Regexp) []string {
+func scanRepositoryFiles(client *github.Client, org, repo, branch, rootPath string, patterns []*regexp.Regexp) []string {
 	var findings []string
-	maxRetries := 3
 
-	var file *github.RepositoryContent
-	var dirs []*github.RepositoryContent
-	var resp *github.Response
-	var err error
+	findingsChan := make(chan string, 100)
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		waitForAPICall()
-		file, dirs, resp, err = client.Repositories.GetContents(
+	var wg sync.WaitGroup
+
+	sem := make(chan struct{}, 5)
+
+	limiter := rate.NewLimiter(rate.Every(720*time.Millisecond), 1)
+
+	var scanPath func(path string)
+	scanPath = func(path string) {
+		defer wg.Done()
+
+		if err := limiter.Wait(context.Background()); err != nil {
+			log.Printf("Rate limiter error on path %q: %v", path, err)
+			return
+		}
+
+		sem <- struct{}{}
+		file, dirs, _, err := client.Repositories.GetContents(
 			context.Background(), org, repo, path,
 			&github.RepositoryContentGetOptions{Ref: branch},
 		)
-		if err == nil {
-			break
-		}
-		if attempt < maxRetries-1 {
-			jitter := time.Duration(rand.Intn(100)) * time.Millisecond
-			time.Sleep(200*time.Millisecond + jitter)
-		}
-	}
-	if err != nil {
-		log.Printf("Error fetching contents for %s at path %q on branch %s after retries: %v\n", repo, path, branch, err)
-		return findings
-	}
-	_ = resp
+		<-sem
 
-	var contents []*github.RepositoryContent
-	if file != nil {
-		contents = append(contents, file)
-	}
-	if dirs != nil {
-		contents = append(contents, dirs...)
-	}
-
-	for _, content := range contents {
-		if content == nil || content.Path == nil {
-			continue
+		if err != nil {
+			log.Printf("Error fetching contents for %s at path %q on branch %s: %v", repo, path, branch, err)
+			return
 		}
 
-		switch content.GetType() {
-		case "file":
-			if strings.EqualFold(*content.Path, "package.json") || strings.EqualFold(*content.Path, "package-lock.json") || strings.EqualFold(*content.Path, "yarn.lock") ||
-				strings.HasSuffix(strings.ToLower(*content.Path), ".md") {
+		var contents []*github.RepositoryContent
+		if file != nil {
+			contents = append(contents, file)
+		}
+		if dirs != nil {
+			contents = append(contents, dirs...)
+		}
+
+		for _, content := range contents {
+			if content == nil || content.Path == nil {
 				continue
 			}
 
-			var fileContent *github.RepositoryContent
-			var respFile *github.Response
-			var errFile error
-			for attempt := 0; attempt < maxRetries; attempt++ {
-				waitForAPICall()
-				fileContent, _, respFile, errFile = client.Repositories.GetContents(
-					context.Background(), org, repo, *content.Path,
-					&github.RepositoryContentGetOptions{Ref: branch},
-				)
-				if errFile == nil && fileContent != nil && fileContent.Content != nil {
-					break
+			switch content.GetType() {
+			case "dir":
+				wg.Add(1)
+				go scanPath(*content.Path)
+			case "file":
+				lowerPath := strings.ToLower(*content.Path)
+				if strings.EqualFold(lowerPath, "package.json") ||
+					strings.EqualFold(lowerPath, "package-lock.json") ||
+					strings.EqualFold(lowerPath, "yarn.lock") ||
+					strings.HasSuffix(lowerPath, ".md") {
+					continue
 				}
-				if attempt < maxRetries-1 {
-					jitter := time.Duration(rand.Intn(100)) * time.Millisecond
-					time.Sleep(200*time.Millisecond + jitter)
-				}
-			}
-			if errFile != nil || fileContent == nil || fileContent.Content == nil {
-				log.Printf("Error reading file %s in %s after retries: %v\n", *content.Path, repo, errFile)
-				continue
-			}
-			_ = respFile
 
-			decoded, errDecode := base64.StdEncoding.DecodeString(*fileContent.Content)
-			if errDecode != nil {
-				log.Printf("Failed to decode file %s: %v", *content.Path, errDecode)
-				continue
-			}
+				wg.Add(1)
+				go func(filePath string) {
+					defer wg.Done()
 
-			fileStr := string(decoded)
-			matches := scanFileForSecrets(fileStr, patterns)
-			if len(matches) > 0 {
-				findings = append(findings, fmt.Sprintf("Found secrets in %s/%s on branch %s: %v",
-					repo, *content.Path, branch, matches))
+					if err := limiter.Wait(context.Background()); err != nil {
+						log.Printf("Rate limiter error on file %q: %v", filePath, err)
+						return
+					}
+
+					sem <- struct{}{}
+					fileContent, _, _, errFile := client.Repositories.GetContents(
+						context.Background(), org, repo, filePath,
+						&github.RepositoryContentGetOptions{Ref: branch},
+					)
+					<-sem
+
+					if errFile != nil || fileContent == nil || fileContent.Content == nil {
+						log.Printf("Error reading file %s in %s on branch %s: %v", filePath, repo, branch, errFile)
+						return
+					}
+
+					decoded, errDecode := base64.StdEncoding.DecodeString(*fileContent.Content)
+					if errDecode != nil {
+						log.Printf("Failed to decode file %s: %v", filePath, errDecode)
+						return
+					}
+
+					fileStr := string(decoded)
+					matches := scanFileForSecrets(fileStr, patterns)
+					if len(matches) > 0 {
+						findingsChan <- fmt.Sprintf("Found secrets in %s/%s on branch %s: %v", repo, filePath, branch, matches)
+					}
+				}(*content.Path)
 			}
-		case "dir":
-			subFindings := scanRepositoryFiles(client, org, repo, branch, *content.Path, patterns)
-			findings = append(findings, subFindings...)
 		}
 	}
 
+	wg.Add(1)
+	go scanPath(rootPath)
+
+	go func() {
+		wg.Wait()
+		close(findingsChan)
+	}()
+
+	for finding := range findingsChan {
+		findings = append(findings, finding)
+	}
 	return findings
 }
 
