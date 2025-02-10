@@ -17,7 +17,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Global rate limiter: one token every 720ms.
 var globalLimiter = rate.NewLimiter(rate.Every(720*time.Millisecond), 1)
 
 type YamlPattern struct {
@@ -75,20 +74,16 @@ func scanFileForSecrets(fileContent string, patterns []*regexp.Regexp) []string 
 	return matches
 }
 
-// scanRepositoryFilesWithTree uses the default branch as the baseline.
-// If the branch being scanned isn't the default, then files unchanged relative to
-// the default branch are skipped.
 func scanRepositoryFilesWithTree(client *github.Client, org, repo, branch, defaultBranch string, patterns []*regexp.Regexp) []string {
 	log.Println("Scanning", repo, "on branch", branch)
 	var findings []string
 
 	var baselineMap map[string]string
-	// Only build a baseline if we are not scanning the default branch.
 	if branch != defaultBranch {
-		// Respect the global rate limiter.
 		if err := globalLimiter.Wait(context.Background()); err != nil {
 			log.Printf("Rate limiter error when fetching baseline tree for %s: %v", repo, err)
 		} else {
+			// @note for every repo, we fetch the baseline tree every time we run this function for a different branch, need to fix that
 			baselineTree, _, err := client.Git.GetTree(context.Background(), org, repo, defaultBranch, true)
 			if err != nil {
 				log.Printf("Error getting tree for default branch %s on repo %s: %v", defaultBranch, repo, err)
@@ -96,7 +91,6 @@ func scanRepositoryFilesWithTree(client *github.Client, org, repo, branch, defau
 				baselineMap = make(map[string]string)
 				for _, be := range baselineTree.Entries {
 					if be.GetType() == "blob" {
-						// Use the file path as key and blob SHA as value.
 						baselineMap[be.GetPath()] = be.GetSHA()
 					}
 				}
@@ -104,7 +98,6 @@ func scanRepositoryFilesWithTree(client *github.Client, org, repo, branch, defau
 		}
 	}
 
-	// Fetch the tree for the current branch.
 	if err := globalLimiter.Wait(context.Background()); err != nil {
 		log.Printf("Rate limiter error when fetching tree for %s on branch %s: %v", repo, branch, err)
 		return findings
@@ -115,14 +108,13 @@ func scanRepositoryFilesWithTree(client *github.Client, org, repo, branch, defau
 		return findings
 	}
 
-	// Iterate through all tree entries.
 	for _, entry := range tree.Entries {
-		// Process only files.
 		if entry.GetType() != "blob" {
 			continue
 		}
 
 		lowerPath := strings.ToLower(entry.GetPath())
+		// @note can add more files to ignore here
 		if strings.EqualFold(lowerPath, "package.json") ||
 			strings.EqualFold(lowerPath, "package-lock.json") ||
 			strings.EqualFold(lowerPath, "yarn.lock") ||
@@ -130,14 +122,12 @@ func scanRepositoryFilesWithTree(client *github.Client, org, repo, branch, defau
 			continue
 		}
 
-		// If a baseline exists and the file is unchanged relative to the default branch, skip it.
 		if baselineMap != nil {
 			if baselineSHA, exists := baselineMap[entry.GetPath()]; exists && baselineSHA == entry.GetSHA() {
 				continue
 			}
 		}
 
-		// Respect the rate limiter before fetching file content.
 		if err := globalLimiter.Wait(context.Background()); err != nil {
 			log.Printf("Rate limiter error on file %q: %v", entry.GetPath(), err)
 			continue
@@ -167,8 +157,6 @@ func scanRepositoryFilesWithTree(client *github.Client, org, repo, branch, defau
 	return findings
 }
 
-// scanReposAndBranches launches scans for multiple branches concurrently.
-// It now uses the repository's default branch directly as the baseline.
 func scanReposAndBranches(client *github.Client, org string, patterns []*regexp.Regexp) {
 	repos, _, err := client.Repositories.ListByOrg(context.Background(), org, &github.RepositoryListByOrgOptions{})
 	if err != nil {
@@ -182,7 +170,6 @@ func scanReposAndBranches(client *github.Client, org string, patterns []*regexp.
 		if repoName == "docs" {
 			continue
 		}
-		// Get the default branch from the repository object.
 		defaultBranch := repo.GetDefaultBranch()
 		branches, _, err := client.Repositories.ListBranches(context.Background(), org, repoName, nil)
 		if err != nil {
@@ -220,7 +207,6 @@ func scanReposAndBranches(client *github.Client, org string, patterns []*regexp.
 			}(repoName, branchName, defaultBranch)
 		}
 	}
-	fmt.Println("Done!")
 	wg.Wait()
 }
 
