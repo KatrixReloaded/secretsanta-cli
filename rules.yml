@@ -4,6 +4,10 @@ patterns:
         regex: '[0-9a-z]+.execute-api.[0-9a-z._-]+.amazonaws.com'
         confidence: low
     - pattern:
+        name: Alchemy and Infura API Keys
+        regex: https?:\/\/[a-zA-Z0-9.-]+\.g\.alchemy\.com\/v2\/[a-zA-Z0-9]+|https?:\/\/(eth|polygon|arb|optimism|solana|zksync|base)\.infura\.io\/v2\/[a-zA-Z0-9]+
+        confidence: low
+    - pattern:
         name: Ethereum Private Key
         regex: /(\b[A-Z_]*PRIVATE[_A-Z]*=\s*"?)(0x)?[0-9a-fA-F]{64}("?)/
         confidence: high
