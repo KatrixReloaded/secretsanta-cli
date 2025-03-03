@@ -8,6 +8,10 @@ patterns:
         regex: https?:\/\/[a-zA-Z0-9.-]+\.g\.alchemy\.com\/v2\/[a-zA-Z0-9]+|https?:\/\/(eth|polygon|arb|optimism|solana|zksync|base)\.infura\.io\/v2\/[a-zA-Z0-9]+
         confidence: low
     - pattern:
+        name: Discord API
+        regex: https?:\/\/(discord(app)?\.com|discord\.gg)\/api\/v\d+\/[a-zA-Z0-9\/?&=_-]+
+        confidence: low
+    - pattern:
         name: Ethereum Private Key
         regex: /(\b[A-Z_]*PRIVATE[_A-Z]*=\s*"?)(0x)?[0-9a-fA-F]{64}("?)/
         confidence: high
