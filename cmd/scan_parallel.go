@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/joho/godotenv"
 	git "gopkg.in/src-d/go-git.v4" // go-git for cloning and repo access
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"gopkg.in/yaml.v2"
@@ -30,6 +32,8 @@ type YamlEntry struct {
 type YamlConfig struct {
 	Patterns []YamlEntry `yaml:"patterns"`
 }
+
+var count int
 
 func loadPatterns(yamlFile string) ([]*regexp.Regexp, error) {
 	data, err := os.ReadFile(yamlFile)
@@ -146,9 +150,15 @@ func cloneAndScanRepo(repoURL string, patterns []*regexp.Regexp, resultsCh chan<
 
 	fmt.Printf("Cloning repository %s into %s...\n", repoURL, tempDir)
 
+	auth := &http.BasicAuth{
+		Username: "KatrixReloaded",
+		Password: os.Getenv("GITHUB_TOKEN"),
+	}
+
 	_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
 		URL:      repoURL,
 		Progress: os.Stdout,
+		Auth:     auth,
 	})
 	if err != nil {
 		log.Printf("Error cloning repository %s: %v", repoURL, err)
@@ -158,6 +168,8 @@ func cloneAndScanRepo(repoURL string, patterns []*regexp.Regexp, resultsCh chan<
 	if err := scanRepoForSecrets(tempDir, repoURL, patterns, resultsCh); err != nil {
 		log.Printf("Error scanning repository %s: %v", repoURL, err)
 	}
+
+	count++
 }
 
 func fetchOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
@@ -185,6 +197,10 @@ func fetchOrgRepos(client *github.Client, org string) ([]*github.Repository, err
 }
 
 func run() {
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found or error loading it")
+	}
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		log.Fatal("GITHUB_TOKEN is not set")
@@ -250,5 +266,6 @@ func run() {
 	}
 
 	wg.Wait()
+	fmt.Println(count)
 	fmt.Println("Scanning complete.")
 }
