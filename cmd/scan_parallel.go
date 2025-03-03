@@ -216,38 +216,6 @@ func scanRepoForSecrets(repoPath, repoURL string, patterns []*regexp.Regexp, pat
 	return err
 }
 
-// func cloneAndScanRepo(repoURL string, patterns []*regexp.Regexp, resultsCh chan<- string) {
-// 	tempDir, err := os.MkdirTemp("", "repo-*")
-// 	if err != nil {
-// 		log.Printf("Error creating temp dir for %s: %v", repoURL, err)
-// 		return
-// 	}
-// 	defer os.RemoveAll(tempDir)
-
-// 	fmt.Printf("Cloning repository %s into %s...\n", repoURL, tempDir)
-
-// 	auth := &http.BasicAuth{
-// 		Username: "KatrixReloaded",
-// 		Password: os.Getenv("GITHUB_TOKEN"),
-// 	}
-
-// 	_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
-// 		URL:      repoURL,
-// 		Progress: os.Stdout,
-// 		Auth:     auth,
-// 	})
-// 	if err != nil {
-// 		log.Printf("Error cloning repository %s: %v", repoURL, err)
-// 		return
-// 	}
-
-// 	if err := scanRepoForSecrets(tempDir, repoURL, patterns, resultsCh); err != nil {
-// 		log.Printf("Error scanning repository %s: %v", repoURL, err)
-// 	}
-
-// 	count++
-// }
-
 func fetchOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
 	var allRepos []*github.Repository
 	opts := &github.RepositoryListByOrgOptions{
