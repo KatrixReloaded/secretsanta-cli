@@ -164,21 +164,6 @@ func scanDiffForSecrets(diff string, patterns []*regexp.Regexp, patternNames map
 
 const reposCache = "cached_repos.json"
 
-// StoreReposToCache saves repository data to JSON file
-func StoreReposToCache(repos []*github.Repository) error {
-	data, err := json.MarshalIndent(repos, "", "  ")
-	if err != nil {
-		return fmt.Errorf("error marshaling repos: %v", err)
-	}
-
-	if err := os.WriteFile(reposCache, data, 0644); err != nil {
-		return fmt.Errorf("error writing cache file: %v", err)
-	}
-
-	fmt.Printf("Stored %d repositories to %s\n", len(repos), reposCache)
-	return nil
-}
-
 // FetchCachedRepos reads repositories from the cache file
 func FetchCachedRepos() ([]*github.Repository, error) {
 	data, err := os.ReadFile(reposCache)
