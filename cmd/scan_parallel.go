@@ -473,7 +473,7 @@ func scanRepoForSecrets(repoPath, repoURL string, since time.Time, patterns []*r
 	return latestCommitTime, err
 }
 
-func run() {
+func Run() {
 	// Initialize count
 	count = 0
 
