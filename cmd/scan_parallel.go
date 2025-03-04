@@ -1,87 +1,149 @@
 package cmd
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/joho/godotenv"
-	git "gopkg.in/src-d/go-git.v4" // go-git for cloning and repo access
+	git "gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/config"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/yaml.v2"
 
 	"github.com/google/go-github/v48/github"
-	"golang.org/x/oauth2"
+	"gopkg.in/yaml.v2"
 )
 
-type YamlPattern struct {
-	Name       string `yaml:"name"`
-	Regex      string `yaml:"regex"`
-	Confidence string `yaml:"confidence"`
-}
+// Constants for controlling resource usage
+const (
+	scanConcurrency = 4                 // @note you can change this value depending on the no. of threads you want to run concurrently
+	reposDir        = "./repos"         // Persistent directory for repositories
+	stateFile       = "scan_state.json" // File to track last run
+	outputFile      = "secrets_report.md"
+	scanIntervalStr = "168h" // 7 days (1 week) between scans
+)
 
-type YamlEntry struct {
-	Pattern YamlPattern `yaml:"pattern"`
-}
-
-type YamlConfig struct {
-	Patterns []YamlEntry `yaml:"patterns"`
-}
-
+// SecretIdentifier uniquely identifies a secret within repos
 type SecretIdentifier struct {
 	FilePath    string
 	Secret      string
 	PatternName string
 }
 
+// SecretMatch represents a secret found in a commit
 type SecretMatch struct {
 	Commit      *object.Commit
 	PatternName string
 	Secret      string
 	FilePath    string
 	RepoURL     string
+	Found       time.Time
 }
 
+// ScanState tracks the state of scanning between runs
+type ScanState struct {
+	LastRun        time.Time            `json:"last_run"`
+	RepoLastCommit map[string]time.Time `json:"repo_last_commit"`
+}
+
+// YamlPattern defines the structure for a secret detection pattern
+type YamlPattern struct {
+	Name       string `yaml:"name"`
+	Regex      string `yaml:"regex"`
+	Confidence string `yaml:"confidence"`
+}
+
+// YamlEntry wraps a pattern
+type YamlEntry struct {
+	Pattern YamlPattern `yaml:"pattern"`
+}
+
+// YamlConfig is the root structure for the rules config
+type YamlConfig struct {
+	Patterns []YamlEntry `yaml:"patterns"`
+}
+
+// Global counter for processed repos
 var count int
 
+// loadState loads the previous scan state from the state file
+func loadState() (*ScanState, error) {
+	data, err := os.ReadFile(stateFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// File doesn't exist, return default state
+			return &ScanState{
+				LastRun:        time.Now().Add(-168 * time.Hour),
+				RepoLastCommit: make(map[string]time.Time),
+			}, nil
+		}
+		return nil, err
+	}
+
+	var state ScanState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, err
+	}
+
+	return &state, nil
+}
+
+// saveState saves the current scan state to the state file
+func saveState(state *ScanState) error {
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(stateFile, data, 0644)
+}
+
+// loadPatterns loads secret detection patterns from the rules file
 func loadPatterns(yamlFile string) ([]*regexp.Regexp, map[*regexp.Regexp]string, error) {
 	data, err := os.ReadFile(yamlFile)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var config YamlConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, nil, err
 	}
 
-	var compiledPatterns []*regexp.Regexp
+	var patterns []*regexp.Regexp
 	patternNames := make(map[*regexp.Regexp]string)
 
 	for _, entry := range config.Patterns {
-		patternStr := entry.Pattern.Regex
-		if strings.HasSuffix(patternStr, `(=| =|:| :)`) {
+		pattern := entry.Pattern.Regex
+
+		// Clean up regex format if needed
+		if strings.HasPrefix(pattern, "/") && strings.HasSuffix(pattern, "/") {
+			pattern = pattern[1 : len(pattern)-1]
+		}
+
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			log.Printf("Warning: Invalid regex '%s' for pattern '%s': %v", pattern, entry.Pattern.Name, err)
 			continue
 		}
 
-		if strings.HasPrefix(patternStr, "/") && strings.HasSuffix(patternStr, "/") {
-			patternStr = patternStr[1 : len(patternStr)-1]
-		}
-
-		re, err := regexp.Compile(patternStr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid regex for %s: %v", entry.Pattern.Name, err)
-		}
-		compiledPatterns = append(compiledPatterns, re)
+		patterns = append(patterns, re)
 		patternNames[re] = entry.Pattern.Name
 	}
-	return compiledPatterns, patternNames, nil
+
+	return patterns, patternNames, nil
 }
 
+// scanDiffForSecrets looks for secrets in diff text using regex patterns
 func scanDiffForSecrets(diff string, patterns []*regexp.Regexp, patternNames map[*regexp.Regexp]string) map[string]string {
 	secretsWithPatterns := make(map[string]string)
 
@@ -96,151 +158,345 @@ func scanDiffForSecrets(diff string, patterns []*regexp.Regexp, patternNames map
 			}
 		}
 	}
+
 	return secretsWithPatterns
 }
 
-func filterFalsePositives(matches []string) []string {
-	var filtered []string
-	ignoreSubstrings := []string{
-		"yarn workspaces",
-		"publish all packages",
-		"run the build script",
-		"workspace",
-		"foreach",
+const reposCache = "cached_repos.json"
+
+// StoreReposToCache saves repository data to JSON file
+func StoreReposToCache(repos []*github.Repository) error {
+	data, err := json.MarshalIndent(repos, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshaling repos: %v", err)
 	}
-	for _, m := range matches {
-		ignore := false
-		lower := strings.ToLower(m)
-		for _, substr := range ignoreSubstrings {
-			if strings.Contains(lower, strings.ToLower(substr)) {
-				ignore = true
-				break
-			}
-		}
-		if !ignore {
-			filtered = append(filtered, m)
-		}
+
+	if err := os.WriteFile(reposCache, data, 0644); err != nil {
+		return fmt.Errorf("error writing cache file: %v", err)
 	}
-	return filtered
+
+	fmt.Printf("Stored %d repositories to %s\n", len(repos), reposCache)
+	return nil
 }
 
-func scanRepoForSecrets(repoPath, repoURL string, patterns []*regexp.Regexp, patternNames map[*regexp.Regexp]string, resultsCh chan<- SecretMatch) error {
+// FetchCachedRepos reads repositories from the cache file
+func FetchCachedRepos() ([]*github.Repository, error) {
+	data, err := os.ReadFile(reposCache)
+	if err != nil {
+		return nil, fmt.Errorf("error reading cache file: %v", err)
+	}
+
+	var repos []*github.Repository
+	if err := json.Unmarshal(data, &repos); err != nil {
+		return nil, fmt.Errorf("error unmarshaling repos: %v", err)
+	}
+
+	fmt.Printf("Loaded %d repositories from cache\n", len(repos))
+	return repos, nil
+}
+
+// appendToReport adds new findings to the existing report file
+func appendToReport(findings []SecretMatch) error {
+	// Create report file if it doesn't exist
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		f, err := os.Create(outputFile)
+		if err != nil {
+			return err
+		}
+		_, err = f.WriteString("# Secret Scanning Results\n\n")
+		if err != nil {
+			return err
+		}
+		f.Close()
+	}
+
+	// If no findings, nothing to do
+	if len(findings) == 0 {
+		return nil
+	}
+
+	// Open file for appending
+	f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Add timestamp section
+	_, err = f.WriteString(fmt.Sprintf("\n## Scan Results - %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	if err != nil {
+		return err
+	}
+
+	// Group findings by repository
+	repoFindings := make(map[string][]SecretMatch)
+	for _, match := range findings {
+		repoURL := match.RepoURL
+		repoFindings[repoURL] = append(repoFindings[repoURL], match)
+	}
+
+	// Write each repository's findings
+	for repoURL, matches := range repoFindings {
+		_, err = f.WriteString(fmt.Sprintf("### Repository: %s\n\n", repoURL))
+		if err != nil {
+			return err
+		}
+
+		for _, match := range matches {
+			// Truncate very long secrets
+			secretDisplay := match.Secret
+			if len(secretDisplay) > 100 {
+				secretDisplay = secretDisplay[:97] + "..."
+			}
+
+			_, err = f.WriteString(fmt.Sprintf("#### %s\n\n", match.PatternName))
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString(fmt.Sprintf("- **File:** %s\n", match.FilePath))
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString(fmt.Sprintf("- **Commit:** `%s`\n", match.Commit.Hash.String()))
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString(fmt.Sprintf("- **Author:** %s <%s>\n", match.Commit.Author.Name, match.Commit.Author.Email))
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString(fmt.Sprintf("- **Date:** %s\n", match.Commit.Author.When.Format("2006-01-02 15:04:05")))
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString(fmt.Sprintf("- **Value:** `%s`\n\n", secretDisplay))
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString("---\n\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func scanRepoForSecrets(repoPath, repoURL string, since time.Time, patterns []*regexp.Regexp, patternNames map[*regexp.Regexp]string, resultsCh chan<- SecretMatch) (time.Time, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return fmt.Errorf("opening repository: %v", err)
+		return since, fmt.Errorf("opening repository: %v", err)
 	}
-	commitIter, err := repo.Log(&git.LogOptions{All: true})
+
+	// Get all branches
+	branches, err := repo.Branches()
 	if err != nil {
-		return fmt.Errorf("getting commit log: %v", err)
+		return since, fmt.Errorf("getting branches: %v", err)
 	}
-	defer commitIter.Close()
 
+	// Map to track all commits by hash (to avoid duplicates)
 	scanned := make(map[string]bool)
-
 	oldestCommits := make(map[SecretIdentifier]*SecretMatch)
 
-	err = commitIter.ForEach(func(c *object.Commit) error {
-		if scanned[c.Hash.String()] {
-			return nil
-		}
-		scanned[c.Hash.String()] = true
+	// Track latest commit time
+	var latestCommitTime time.Time
 
-		if c.NumParents() == 0 {
-			return nil
-		}
-		parent, err := c.Parent(0)
+	// Process each branch
+	err = branches.ForEach(func(ref *plumbing.Reference) error {
+		commitIter, err := repo.Log(&git.LogOptions{
+			From:  ref.Hash(),
+			Order: git.LogOrderCommitterTime,
+		})
 		if err != nil {
-			return err
+			return fmt.Errorf("getting commit log: %v", err)
 		}
-		patch, err := parent.Patch(c)
-		if err != nil {
-			return err
-		}
-		diffText := patch.String()
-		if diffText == "" {
-			return nil
-		}
+		defer commitIter.Close()
 
-		secretsWithPatterns := scanDiffForSecrets(diffText, patterns, patternNames)
-		if len(secretsWithPatterns) == 0 {
-			return nil
-		}
-
-		for _, filePatch := range patch.FilePatches() {
-			from, to := filePatch.Files()
-			filePath := ""
-			if to != nil {
-				filePath = to.Path()
-			} else if from != nil {
-				filePath = from.Path()
+		// Process commits in this branch
+		err = commitIter.ForEach(func(c *object.Commit) error {
+			// Only process newer commits
+			if c.Committer.When.Before(since) || c.Committer.When.Equal(since) {
+				return nil
 			}
 
-			if filePath == "" {
-				continue
+			// Update latest commit time if this is newer
+			if c.Committer.When.After(latestCommitTime) {
+				latestCommitTime = c.Committer.When
 			}
 
-			// For each secret, track the oldest commit
+			// Skip already processed commits
+			if scanned[c.Hash.String()] {
+				return nil
+			}
+			scanned[c.Hash.String()] = true
+
+			// Process commits regardless of whether they have parents
+			var diffText string
+
+			if c.NumParents() > 0 {
+				// Normal commit with parent
+				parent, err := c.Parent(0)
+				if err != nil {
+					// Try to get content directly if we can't get the parent
+					tree, err := c.Tree()
+					if err == nil {
+						var allFileContent strings.Builder
+						tree.Files().ForEach(func(f *object.File) error {
+							content, err := f.Contents()
+							if err == nil {
+								allFileContent.WriteString(content)
+							}
+							return nil
+						})
+						diffText = allFileContent.String()
+					}
+				} else {
+					patch, err := parent.Patch(c)
+					if err == nil {
+						diffText = patch.String()
+					}
+				}
+			} else {
+				// Initial commit - get full content
+				tree, err := c.Tree()
+				if err == nil {
+					var allFileContent strings.Builder
+					tree.Files().ForEach(func(f *object.File) error {
+						content, err := f.Contents()
+						if err == nil {
+							allFileContent.WriteString(content)
+						}
+						return nil
+					})
+					diffText = allFileContent.String()
+				}
+			}
+
+			// Skip if no content to analyze
+			if diffText == "" {
+				return nil
+			}
+
+			// Look for secrets
+			secretsWithPatterns := scanDiffForSecrets(diffText, patterns, patternNames)
+			if len(secretsWithPatterns) == 0 {
+				return nil
+			}
+
+			// Associate secrets with files
+			var filePaths []string
+
+			// For regular commits, get file paths from patch
+			if c.NumParents() > 0 {
+				parent, err := c.Parent(0)
+				if err == nil {
+					patch, err := parent.Patch(c)
+					if err == nil {
+						for _, filePatch := range patch.FilePatches() {
+							from, to := filePatch.Files()
+							filePath := ""
+							if to != nil {
+								filePath = to.Path()
+							} else if from != nil {
+								filePath = from.Path()
+							}
+
+							if filePath != "" {
+								filePaths = append(filePaths, filePath)
+							}
+						}
+					}
+				}
+			}
+
+			// For initial commits or if patch doesn't work, get file paths from tree
+			if len(filePaths) == 0 {
+				tree, err := c.Tree()
+				if err == nil {
+					tree.Files().ForEach(func(f *object.File) error {
+						filePaths = append(filePaths, f.Name)
+						return nil
+					})
+				}
+			}
+
+			// If we still don't have file paths, use a placeholder
+			if len(filePaths) == 0 {
+				filePaths = append(filePaths, "unknown-file")
+			}
+
+			// For each secret, associate with files and track the oldest commit
 			for secret, patternName := range secretsWithPatterns {
 				if len(secret) > 500 {
 					continue
 				}
 
-				id := SecretIdentifier{
-					FilePath:    filePath,
-					Secret:      secret,
-					PatternName: patternName,
-				}
+				// Associate with each file
+				for _, filePath := range filePaths {
+					id := SecretIdentifier{
+						FilePath:    filePath,
+						Secret:      secret,
+						PatternName: patternName,
+					}
 
-				match := &SecretMatch{
-					Commit:      c,
-					PatternName: patternName,
-					Secret:      secret,
-					FilePath:    filePath,
-					RepoURL:     repoURL,
-				}
+					match := &SecretMatch{
+						Commit:      c,
+						PatternName: patternName,
+						Secret:      secret,
+						FilePath:    filePath,
+						RepoURL:     repoURL,
+						Found:       time.Now(),
+					}
 
-				existing, found := oldestCommits[id]
-				if !found || c.Committer.When.Before(existing.Commit.Committer.When) {
-					oldestCommits[id] = match
+					existing, found := oldestCommits[id]
+					if !found || c.Committer.When.Before(existing.Commit.Committer.When) {
+						oldestCommits[id] = match
+					}
 				}
 			}
-		}
 
-		return nil
+			return nil
+		})
+
+		return err
 	})
 
+	// Send all secrets found
 	for _, match := range oldestCommits {
 		resultsCh <- *match
 	}
 
-	return err
-}
+	// Clear maps to free memory
+	scanned = nil
+	oldestCommits = nil
 
-func fetchOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
-	var allRepos []*github.Repository
-	opts := &github.RepositoryListByOrgOptions{
-		ListOptions: github.ListOptions{PerPage: 100},
+	// Force garbage collection to clean up memory
+	runtime.GC()
+
+	// Return the latest commit time we found
+	if latestCommitTime.IsZero() {
+		return since, err // No new commits found
 	}
-	for {
-		repos, resp, err := client.Repositories.ListByOrg(context.Background(), org, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, repo := range repos {
-			if repo.GetName() == "docs" {
-				continue
-			}
-			allRepos = append(allRepos, repo)
-		}
-		if resp.NextPage == 0 {
-			break
-		}
-		opts.Page = resp.NextPage
-	}
-	return allRepos, nil
+
+	return latestCommitTime, err
 }
 
 func run() {
+	// Initialize count
+	count = 0
+
+	// Create persistent directories if they don't exist
+	if err := os.MkdirAll(reposDir, 0755); err != nil {
+		log.Fatalf("Failed to create repos directory: %v", err)
+	}
+
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("No .env file found or error loading it")
 	}
@@ -250,186 +506,216 @@ func run() {
 		log.Fatal("GITHUB_TOKEN is not set")
 	}
 
+	// Load state from previous run
+	state, err := loadState()
+	if err != nil {
+		log.Printf("Error loading state, starting from scratch: %v", err)
+		state = &ScanState{
+			LastRun:        time.Now().Add(-168 * time.Hour), // Default to 1 week ago
+			RepoLastCommit: make(map[string]time.Time),
+		}
+	}
+
 	patterns, patternNames, err := loadPatterns("rules.yml")
 	if err != nil {
 		log.Fatalf("Error loading patterns: %v", err)
 	}
 
-	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	tc := oauth2.NewClient(context.Background(), ts)
-	ghClient := github.NewClient(tc)
-
 	org := "catalogfi"
 
-	repos, err := fetchOrgRepos(ghClient, org)
+	repos, err := FetchCachedRepos()
 	if err != nil {
 		log.Fatalf("Error fetching repos for org %s: %v", org, err)
 	}
 
-	// Change the channel type to match SecretMatch
 	resultsCh := make(chan SecretMatch, 100)
+	var allFindings []SecretMatch
 
+	// Collect results in the background
 	var resultsWg sync.WaitGroup
 	resultsWg.Add(1)
 	go func() {
 		defer resultsWg.Done()
-		outFile := "secrets_report.md"
-		f, err := os.Create(outFile)
-		if err != nil {
-			log.Fatalf("Error creating output file: %v", err)
-		}
-		defer f.Close()
-
-		// Create a more readable report format
-		_, err = f.WriteString("# Secret Scanning Results\n\n")
-		if err != nil {
-			log.Printf("Error writing to file: %v", err)
-		}
-
-		// Group secrets by repository
-		repoSecrets := make(map[string][]SecretMatch)
-
 		for match := range resultsCh {
-			// Now we can use the RepoURL field directly
-			repoSecrets[match.RepoURL] = append(repoSecrets[match.RepoURL], match)
+			allFindings = append(allFindings, match)
 		}
-
-		// Write secrets organized by repository
-		for repo, matches := range repoSecrets {
-			_, err = f.WriteString(fmt.Sprintf("## Repository: %s\n\n", repo))
-			if err != nil {
-				log.Printf("Error writing to file: %v", err)
-			}
-
-			for _, match := range matches {
-				// Format secret - truncate if too long
-				secretDisplay := match.Secret
-				if len(secretDisplay) > 100 {
-					secretDisplay = secretDisplay[:97] + "..."
-				}
-
-				// Write formatted entry
-				_, err = f.WriteString(fmt.Sprintf("### %s\n\n", match.PatternName))
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-
-				_, err = f.WriteString(fmt.Sprintf("- **File:** %s\n", match.FilePath))
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-
-				_, err = f.WriteString(fmt.Sprintf("- **Commit:** `%s`\n", match.Commit.Hash.String()))
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-
-				_, err = f.WriteString(fmt.Sprintf("- **Author:** %s <%s>\n", match.Commit.Author.Name, match.Commit.Author.Email))
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-
-				_, err = f.WriteString(fmt.Sprintf("- **Date:** %s\n", match.Commit.Author.When.Format("2006-01-02 15:04:05")))
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-
-				_, err = f.WriteString(fmt.Sprintf("- **Value:** `%s`\n\n", secretDisplay))
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-
-				_, err = f.WriteString("---\n\n")
-				if err != nil {
-					log.Printf("Error writing to file: %v", err)
-				}
-			}
-		}
-
-		log.Printf("Secret findings written to %s", outFile)
 	}()
 
-	// Step 1: Clone all repositories in parallel
 	type RepoInfo struct {
-		URL     string
-		TempDir string
+		URL      string
+		LocalDir string
+		Exists   bool
 	}
 
-	var repoInfosMutex sync.Mutex
 	var repoInfos []RepoInfo
-	var cloneWg sync.WaitGroup
 
+	// First check which repos we already have locally
 	for _, repo := range repos {
 		if repo.GetArchived() {
 			continue
 		}
+
 		cloneURL := repo.GetCloneURL()
 		if cloneURL == "" {
 			continue
 		}
 
-		cloneWg.Add(1)
-		go func(url string) {
-			defer cloneWg.Done()
+		// Create a normalized repo directory name from the URL
+		repoName := strings.TrimSuffix(filepath.Base(cloneURL), ".git")
+		repoDir := filepath.Join(reposDir, repoName)
 
-			tempDir, err := os.MkdirTemp("", "repo-*")
-			if err != nil {
-				log.Printf("Error creating temp dir for %s: %v", url, err)
-				return
-			}
+		exists := false
+		if _, err := os.Stat(repoDir); !os.IsNotExist(err) {
+			exists = true
+		}
 
-			fmt.Printf("Cloning repository %s into %s...\n", url, tempDir)
+		repoInfos = append(repoInfos, RepoInfo{
+			URL:      cloneURL,
+			LocalDir: repoDir,
+			Exists:   exists,
+		})
+	}
+
+	// Clone or update repositories with limited concurrency
+	var repoWg sync.WaitGroup
+	repoSem := make(chan struct{}, scanConcurrency)
+
+	for _, info := range repoInfos {
+		repoWg.Add(1)
+		go func(info RepoInfo) {
+			defer repoWg.Done()
+
+			repoSem <- struct{}{}
+			defer func() { <-repoSem }()
 
 			auth := &http.BasicAuth{
-				Username: "KatrixReloaded",
+				Username: "username", // Username doesn't matter for GitHub token auth
 				Password: token,
 			}
 
-			_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
-				URL:      url,
-				Progress: os.Stdout,
-				Auth:     auth,
-			})
-			if err != nil {
-				log.Printf("Error cloning repository %s: %v", url, err)
-				os.RemoveAll(tempDir)
-				return
-			}
+			if info.Exists {
+				// Update existing repository
+				fmt.Printf("Updating repository %s...\n", info.URL)
 
-			repoInfosMutex.Lock()
-			repoInfos = append(repoInfos, RepoInfo{URL: url, TempDir: tempDir})
-			repoInfosMutex.Unlock()
-		}(cloneURL)
+				repo, err := git.PlainOpen(info.LocalDir)
+				if err != nil {
+					log.Printf("Error opening repository %s: %v", info.URL, err)
+					return
+				}
+
+				// Fetch updates for all branches
+				err = repo.Fetch(&git.FetchOptions{
+					RefSpecs: []config.RefSpec{config.RefSpec("+refs/heads/*:refs/remotes/origin/*")},
+					Auth:     auth,
+					Force:    true,
+				})
+
+				if err != nil && err != git.NoErrAlreadyUpToDate {
+					log.Printf("Error fetching updates for repository %s: %v", info.URL, err)
+				}
+
+				// Attempt to pull updates for the current branch
+				w, err := repo.Worktree()
+				if err != nil {
+					log.Printf("Error getting worktree for repository %s: %v", info.URL, err)
+				} else {
+					err = w.Pull(&git.PullOptions{
+						RemoteName: "origin",
+						Auth:       auth,
+					})
+					if err != nil && err != git.NoErrAlreadyUpToDate {
+						log.Printf("Error pulling updates for repository %s: %v", info.URL, err)
+					}
+				}
+			} else {
+				// Clone new repository
+				fmt.Printf("Cloning repository %s...\n", info.URL)
+
+				_, err := git.PlainClone(info.LocalDir, false, &git.CloneOptions{
+					URL:      info.URL,
+					Auth:     auth,
+					Progress: os.Stdout,
+				})
+
+				if err != nil {
+					log.Printf("Error cloning repository %s: %v", info.URL, err)
+					return
+				}
+			}
+		}(info)
 	}
 
-	cloneWg.Wait()
-	fmt.Printf("Cloned %d repositories successfully\n", len(repoInfos))
+	repoWg.Wait()
+	fmt.Printf("Processed %d repositories\n", len(repoInfos))
 
-	// Step 2: Scan repositories with limited concurrency
-	scanConcurrency := 6 // Limit to 6 as requested
-	scanSem := make(chan struct{}, scanConcurrency)
+	// Now scan repositories with limited concurrency
 	var scanWg sync.WaitGroup
+	scanSem := make(chan struct{}, scanConcurrency)
+
+	// Create a new state to track this run
+	newState := &ScanState{
+		LastRun:        time.Now(),
+		RepoLastCommit: make(map[string]time.Time),
+	}
 
 	for _, info := range repoInfos {
 		scanWg.Add(1)
-		go func(tempDir, url string) {
+		go func(info RepoInfo) {
 			defer scanWg.Done()
-			defer os.RemoveAll(tempDir) // Clean up temp dir after scanning
 
 			scanSem <- struct{}{}
-			if err := scanRepoForSecrets(tempDir, url, patterns, patternNames, resultsCh); err != nil {
-				log.Printf("Error scanning repository %s: %v", url, err)
+			defer func() { <-scanSem }()
+
+			// Get the time since which we should scan
+			since := state.LastRun
+			if lastCommit, ok := state.RepoLastCommit[info.URL]; ok && lastCommit.After(since) {
+				since = lastCommit
 			}
-			<-scanSem
+
+			// Scan the repo for secrets since last check
+			fmt.Printf("Scanning repository %s (changes since %s)...\n",
+				info.URL, since.Format("2006-01-02 15:04:05"))
+
+			lastCommitTime, err := scanRepoForSecrets(
+				info.LocalDir,
+				info.URL,
+				since,
+				patterns,
+				patternNames,
+				resultsCh,
+			)
+
+			if err != nil {
+				log.Printf("Error scanning repository %s: %v", info.URL, err)
+			}
+
+			// Save the latest commit time for this repo
+			if lastCommitTime.After(since) {
+				newState.RepoLastCommit[info.URL] = lastCommitTime
+			} else {
+				newState.RepoLastCommit[info.URL] = since
+			}
 
 			count++
-		}(info.TempDir, info.URL)
+		}(info)
 	}
 
 	scanWg.Wait()
 	close(resultsCh)
 	resultsWg.Wait()
 
-	fmt.Println(count)
+	// Write findings to report
+	if err := appendToReport(allFindings); err != nil {
+		log.Printf("Error writing report: %v", err)
+	} else {
+		log.Printf("Updated findings in %s", outputFile)
+	}
+
+	// Save state for next run
+	if err := saveState(newState); err != nil {
+		log.Printf("Error saving state: %v", err)
+	}
+
+	fmt.Printf("Scanned %d repositories\n", count)
 	fmt.Println("Scanning complete.")
 }
